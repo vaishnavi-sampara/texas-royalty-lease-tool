@@ -22,3 +22,10 @@
 - Check that the code does what the task says
 - Run the tests locally if you can
 - Leave clear, friendly comments; approve when it's ready
+
+## Where code goes
+- One module per task, in the folder for that step: pipeline/, forecasting/, valuation/ or app/
+- Name the file after your task (e.g. pipeline/load_prices.py)
+- One test file per module: tests/test_<module_name>.py
+- Outputs go to data/processed/ in the formats in docs/data_contracts.md
+- Check the repo first so two people don't create the same file
