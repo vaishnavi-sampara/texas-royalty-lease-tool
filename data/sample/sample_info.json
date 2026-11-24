@@ -1,0 +1,17 @@
+{
+  "source": "PDQ_DSV.zip",
+  "district": "08",
+  "district_no_codes": [
+    "10"
+  ],
+  "start_year": 2015,
+  "latest_complete_month": "2026-07",
+  "seed": 42,
+  "leases_chosen": 200,
+  "leases_long_history": 160,
+  "leases_short_history": 30,
+  "leases_never_producing": 10,
+  "production_rows": 19208,
+  "raw_rows": 20283,
+  "made_at": "2026-11-24T14:36:29"
+}
