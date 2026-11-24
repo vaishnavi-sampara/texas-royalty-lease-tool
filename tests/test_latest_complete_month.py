@@ -79,6 +79,49 @@ def test_gas_only_leases_count_as_producing():
     assert latest_complete_month(con) == month(24)
 
 
+def test_normal_comes_from_the_12_months_before_the_last_12():
+    # Months 0-13 have 100 producing leases, months 14-25 have 60. The baseline is
+    # months 2-13 (12 to 24 months back), so normal = 100 and the recent months at 60
+    # are all below 95%. If all months were used instead, the result would differ.
+    con = connect(make_production([100] * 14 + [60] * 12))
+    assert latest_complete_month(con) == month(13)
+
+
+def test_shorter_history_uses_the_months_available_for_the_baseline():
+    # 14 months: the baseline is just months 0-1, which still gives a sensible answer.
+    con = connect(make_production([100] * 13 + [50]))
+    assert latest_complete_month(con) == month(12)
+
+
+def test_missing_volumes_count_as_zero():
+    df = make_production([100] * 25)
+    last = df.year_month == month(24)
+    df.loc[last, ["oil_bbl", "gas_mcf"]] = None
+    con = connect(df)
+    assert latest_complete_month(con) == month(23)
+
+
+def test_negative_volume_does_not_hide_other_production():
+    # Each volume is checked on its own: oil 5 with gas -10 is still a producing lease
+    # (adding them up would give -5 and wrongly count it as not producing).
+    df = make_production([100] * 25)
+    last = df.year_month == month(24)
+    df.loc[last, "oil_bbl"] = 5.0
+    df.loc[last, "gas_mcf"] = -10.0
+    con = connect(df)
+    assert latest_complete_month(con) == month(24)
+
+
+def test_rows_without_a_month_are_flagged_incomplete():
+    df = make_production([100] * 24 + [98, 0])
+    df = pd.concat([df, df.iloc[[0]].assign(year_month=None)], ignore_index=True)
+    con = connect(df)
+    assert latest_complete_month(con) == month(24)
+    flagged = flag_incomplete_months(con).df()
+    assert flagged.is_complete.notna().all()
+    assert not flagged.loc[flagged.year_month.isna(), "is_complete"].any()
+
+
 def test_uses_the_latest_month_meeting_the_threshold():
     # The task asks for the latest month with at least 95%, so a later month that
     # recovers to 100 counts even though the month before it dipped.

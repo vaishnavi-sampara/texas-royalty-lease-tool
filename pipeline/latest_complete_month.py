@@ -7,12 +7,14 @@ the normal number of producing leases, and flags every later month as
 incomplete (is_complete = False), as described in docs/data_contracts.md.
 
 Definitions used here:
-- A lease is producing in a month if oil_bbl + gas_mcf > 0 (nulls count as 0).
+- A lease is producing in a month if oil_bbl > 0 or gas_mcf > 0 (nulls count as 0).
 - The normal number of producing leases is the median monthly count over the
-  12 months before the most recent 12 months in the table. This is a choice
+  12 months before the most recent 12 months in the table (or as many of those
+  months as exist, if the table has less than 24 months). This is a choice
   made for this module, not something fixed by the data contract.
 - The latest complete month is the latest month whose count is at least
   95% of that normal number.
+- Rows with no year_month are left out of the counts and flagged incomplete.
 
 Usage from the command line (reads and rewrites the production table):
     python -m pipeline.latest_complete_month
@@ -36,10 +38,11 @@ MONTHLY_PRODUCING_SQL = """
 SELECT
     year_month,
     count(DISTINCT lease_key) FILTER (
-        WHERE coalesce(oil_bbl, 0) + coalesce(gas_mcf, 0) > 0
+        WHERE coalesce(oil_bbl, 0) > 0 OR coalesce(gas_mcf, 0) > 0
     ) AS producing_leases,
     row_number() OVER (ORDER BY year_month DESC) AS months_back
 FROM {table}
+WHERE year_month IS NOT NULL
 GROUP BY year_month
 """
 
@@ -118,9 +121,10 @@ def flag_incomplete_months(
 def _flag_sql(con: duckdb.DuckDBPyConnection, table: str) -> str:
     """SQL that sets is_complete from the cut-off month passed as $1."""
     columns = [row[0] for row in con.execute(f"DESCRIBE {table}").fetchall()]
+    flag = "coalesce(year_month <= $1, false)"  # rows with no year_month count as incomplete
     if "is_complete" in columns:
-        return f"SELECT * REPLACE (year_month <= $1 AS is_complete) FROM {table}"
-    return f"SELECT *, year_month <= $1 AS is_complete FROM {table}"
+        return f"SELECT * REPLACE ({flag} AS is_complete) FROM {table}"
+    return f"SELECT *, {flag} AS is_complete FROM {table}"
 
 
 def _sql_path(path: Path) -> str:
@@ -129,9 +133,12 @@ def _sql_path(path: Path) -> str:
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description="Latest-complete-month cut-off.")
     parser.add_argument("--input", type=Path, default=DEFAULT_PATH, help="production table (Parquet)")
-    parser.add_argument("--output", type=Path, default=None, help="where to write the flagged table (default: overwrite input)")
+    parser.add_argument(
+        "--output", type=Path, default=None,
+        help="where to write the flagged table (default: overwrite input)",
+    )
     args = parser.parse_args(argv)
     output = args.output or args.input
 
