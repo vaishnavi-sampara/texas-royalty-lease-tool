@@ -123,6 +123,11 @@ def _flag_sql(con: duckdb.DuckDBPyConnection, table: str) -> str:
     return f"SELECT *, year_month <= $1 AS is_complete FROM {table}"
 
 
+def _sql_path(path: Path) -> str:
+    """A file path as a SQL string literal (file paths can't be SQL parameters here)."""
+    return "'" + path.as_posix().replace("'", "''") + "'"
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--input", type=Path, default=DEFAULT_PATH, help="production table (Parquet)")
@@ -131,9 +136,9 @@ def main(argv: list[str] | None = None) -> None:
     output = args.output or args.input
 
     con = duckdb.connect()
-    con.execute(f"CREATE TABLE production AS SELECT * FROM read_parquet('{args.input.as_posix()}')")
+    con.execute(f"CREATE TABLE production AS SELECT * FROM read_parquet({_sql_path(args.input)})")
     latest = latest_complete_month(con)
-    con.execute(f"COPY ({_flag_sql(con, 'production')}) TO '{output.as_posix()}' (FORMAT parquet)", [latest])
+    con.execute(f"COPY ({_flag_sql(con, 'production')}) TO {_sql_path(output)} (FORMAT parquet)", [latest])
     print(f"Latest complete month: {latest:%Y-%m}. Wrote {output}.")
 
 

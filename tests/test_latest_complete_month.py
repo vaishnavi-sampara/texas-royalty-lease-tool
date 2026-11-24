@@ -123,6 +123,19 @@ def test_rejects_an_unsafe_table_name():
         latest_complete_month(con, table="production; DROP TABLE production")
 
 
+def test_main_handles_a_path_with_an_apostrophe(tmp_path):
+    folder = tmp_path / "ganesh's data"
+    folder.mkdir()
+    src = folder / "production.parquet"
+    make_production([100] * 24 + [98, 0]).to_parquet(src, index=False)
+
+    main(["--input", str(src)])  # default: overwrite the input in place
+
+    flagged = pd.read_parquet(src)
+    assert "is_complete" in flagged.columns
+    assert not flagged.loc[pd.to_datetime(flagged.year_month) == ts(25), "is_complete"].any()
+
+
 def test_main_writes_flagged_parquet(tmp_path):
     df = make_production([100] * 24 + [98, 80, 0])
     src = tmp_path / "production.parquet"
