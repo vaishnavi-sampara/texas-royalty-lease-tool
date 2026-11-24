@@ -9,7 +9,7 @@ One row per lease per month. File: data/processed/production.parquet
 | Column       | Type   | Description |
 |--------------|--------|-------------|
 | lease_key    | string | district + lease number + oil/gas code, e.g. "08-12345-O" |
-| district     | string | RRC district, e.g. "08" |
+| district     | string | Official RRC district (DISTRICT_NAME), e.g. "08" |
 | oil_gas_code | string | "O" = oil lease, "G" = gas lease |
 | year_month   | date   | First day of the production month |
 | oil_bbl      | float  | Oil + condensate (barrels) |
@@ -33,7 +33,7 @@ One row per lease. File: data/processed/leases.parquet
 | operator_name | string | Latest operator |
 | field_name    | string | Field name |
 | county        | string | County, where available |
-| wells         | int    | Number of wells on the lease |
+| wells         | int    | Number of distinct wells (API numbers); a recompleted well counts once |
 
 ## 3. prices
 One row per month. File: data/processed/prices.csv
@@ -50,6 +50,12 @@ One row per month. File: data/processed/prices.csv
    (RRC fills unreported months with zeros)
 3. Leases with no production since 2015 are excluded
 4. History is keyed on the lease, not the operator (operators change)
+5. Months with no row in the source are left missing, not filled with zero
 
 ## Sample data
-data/sample/ holds the same tables for about 200 District 08 leases, for development and tests.
+data/sample/ holds a District 08 sample (seed 42, 2015 onward) for development and tests:
+- raw/lease_cycle_sample.dsv and raw/well_completion_sample.dsv: raw RRC rows for 200
+  leases, in the dump's format ('}'-delimited, all columns)
+- production.parquet and leases.parquet: the processed tables for the 190 leases that
+  produced (the 10 never-producing leases are in raw only, per rule 3)
+- sample_info.json: how the sample was
